@@ -135,7 +135,7 @@ class DataProcessor:
 
         return price_array, tech_array, turbulence_array
 
-    def data_split(self, df, start, end, target_date_col="date"):
+    def data_split(self, df, start, end, target_date_col="time"):
         """
         split the dataset into training or testing using date
         :param data: (df) pandas dataframe, start, end
@@ -146,6 +146,11 @@ class DataProcessor:
         data.index = data[target_date_col].factorize()[0]
         return data
 
+    def fillna(self):
+        self.processor.dataframe = self.dataframe
+        self.processor.fillna()
+        self.dataframe = self.processor.dataframe
+
     def run(
         self,
         ticker_list: str,
@@ -154,7 +159,6 @@ class DataProcessor:
         cache: bool = False,
         select_stockstats_talib: int = 0,
     ):
-
         if self.time_interval == "1s" and self.data_source != "binance":
             raise ValueError(
                 "Currently 1s interval data is only supported with 'binance' as data source"

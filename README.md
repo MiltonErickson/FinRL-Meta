@@ -11,7 +11,7 @@ FinRL-Meta ([docs website](https://finrl.readthedocs.io/en/latest/finrl_meta/bac
 
 1. FinRL-Meta provides hundreds of market environments.
 2. FinRL-Meta reproduces existing papers as benchmarks.
-3. FinRL-Meta provides tens of demos/tutorials, organized in a curriculum.
+3. FinRL-Meta provides dozens of demos/tutorials, organized in a curriculum.
 
 
 Previously called **Neo_FinRL**: **N**ear real-market **E**nvironments f**o**r data-driven **Fin**ancial **R**einforcement **L**earning.
@@ -157,3 +157,17 @@ For future work, we plan to build a multi-agent-based market simulator that cons
 
 
 **Disclaimer: Nothing herein is financial advice, and NOT a recommendation to trade real money. Please use common sense and always first consult a professional before trading or investing.**
+
+
+## Aaron's installation cheatsheet
+"""
+conda create -n finrl --no-default-packages
+conda activate finrl
+mamba install -y python==3.8 swig
+mamba install -y ta-lib -c conda-forge
+mamba install -y pytorch -c pytorch
+mamba install tensorboard
+pip install -e .
+"""
+
+The last line allows you to edit the python files without having to redo the pip install

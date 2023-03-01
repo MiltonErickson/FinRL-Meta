@@ -94,6 +94,51 @@ class _Base:
             ]
         ]
 
+    def fillna(self):
+        df = self.dataframe
+
+        dfcode = pd.DataFrame(columns=["tic"])
+        dfdate = pd.DataFrame(columns=["time"])
+
+        dfcode.tic = df.tic.unique()
+        dfdate.time = df.time.unique()
+        dfdate.sort_values(by="time", ascending=False, ignore_index=True, inplace=True)
+
+        # the old pandas may not support pd.merge(how="cross")
+        try:
+            df1 = pd.merge(dfcode, dfdate, how="cross")
+        except:
+            print("Please wait for a few seconds...")
+            df1 = pd.DataFrame(columns=["tic", "time"])
+            for i in range(dfcode.shape[0]):
+                for j in range(dfdate.shape[0]):
+                    df1 = df1.append(
+                        pd.DataFrame(
+                            data={
+                                "tic": dfcode.iat[i, 0],
+                                "time": dfdate.iat[j, 0],
+                            },
+                            index=[(i + 1) * (j + 1) - 1],
+                        )
+                    )
+
+        df = pd.merge(df1, df, how="left", on=["tic", "time"])
+
+        # back fill missing data then front fill
+        df_new = pd.DataFrame(columns=df.columns)
+        for i in df.tic.unique():
+            df_tmp = df[df.tic == i].fillna(method="bfill").fillna(method="ffill")
+            df_new = pd.concat([df_new, df_tmp], ignore_index=True)
+
+        df_new = df_new.fillna(0)
+
+        # reshape dataframe
+        df_new = df_new.sort_values(by=["time", "tic"]).reset_index(drop=True)
+
+        print("Shape of DataFrame: ", df_new.shape)
+
+        self.dataframe = df_new
+
     def get_trading_days(self, start: str, end: str) -> List[str]:
         if self.data_source in [
             "binance",
@@ -108,8 +153,12 @@ class _Base:
             return None
 
     # select_stockstats_talib: 0 (stockstats, default), or 1 (use talib). Users can choose the method.
+    # drop_na_timestep: 0 (not dropping timesteps that contain nan), or 1 (dropping timesteps that contain nan, default). Users can choose the method.
     def add_technical_indicator(
-        self, tech_indicator_list: List[str], select_stockstats_talib: int = 0
+        self,
+        tech_indicator_list: List[str],
+        select_stockstats_talib: int = 0,
+        drop_na_timesteps: int = 1,
     ):
         """
         calculate technical indicators
@@ -189,8 +238,11 @@ class _Base:
             self.dataframe = final_df
 
         self.dataframe.sort_values(by=["time", "tic"], inplace=True)
-        time_to_drop = self.dataframe[self.dataframe.isna().any(axis=1)].time.unique()
-        self.dataframe = self.dataframe[~self.dataframe.time.isin(time_to_drop)]
+        if drop_na_timesteps:
+            time_to_drop = self.dataframe[
+                self.dataframe.isna().any(axis=1)
+            ].time.unique()
+            self.dataframe = self.dataframe[~self.dataframe.time.isin(time_to_drop)]
         print("Succesfully add technical indicators")
 
     def add_turbulence(self):
@@ -223,9 +275,8 @@ class _Base:
         ]:
             turbulence_index = self.calculate_turbulence()
             self.dataframe = self.dataframe.merge(turbulence_index, on="time")
-            self.dataframe.sort_values(["time", "tic"], inplace=True).reset_index(
-                drop=True, inplace=True
-            )
+            self.dataframe.sort_values(["time", "tic"], inplace=True)
+            self.dataframe.reset_index(drop=True, inplace=True)
 
     def calculate_turbulence(self, time_period: int = 252) -> pd.DataFrame:
         """calculate turbulence index based on dow 30"""
@@ -339,11 +390,13 @@ class _Base:
             pass
         df = self.dataframe.copy()
         self.dataframe = [ticker]
-        self.download_data(self.start, self.end, self.time_interval)
+        # self.download_data(self.start_date, self.end_date, self.time_interval)
+        self.download_data([ticker], save_path="./data/vix.csv")
         self.clean_data()
-        # vix = cleaned_vix[["time", "close"]]
-        # vix = vix.rename(columns={"close": "VIXY"})
-        cleaned_vix = self.dataframe.rename(columns={ticker: "vix"})
+        cleaned_vix = self.dataframe
+        # .rename(columns={ticker: "vix"})
+        vix = cleaned_vix[["time", "close"]]
+        cleaned_vix = vix.rename(columns={"close": "vix"})
 
         df = df.merge(cleaned_vix, on="time")
         df = df.sort_values(["time", "tic"]).reset_index(drop=True)
@@ -562,7 +615,10 @@ def calc_time_zone(
     elif ticker_list == LQ45_TICKER:
         time_zone = TIME_ZONE_JAKARTA
     else:
-        raise ValueError("Time zone is wrong.")
+        # hack needed to have this working with vix indicator
+        # fix: unable to set time_zone_selfdefined from top-level dataprocessor class
+        time_zone = TIME_ZONE_USEASTERN
+        # raise ValueError("Time zone is wrong.")
     return time_zone
 
 
